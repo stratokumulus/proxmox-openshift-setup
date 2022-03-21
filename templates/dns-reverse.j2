@@ -1,0 +1,26 @@
+{# DNS reverse zone file #}
+$TTL    604800
+@       IN      SOA     {{ valet.name }}.{{ dns.domain }}. admin.{{ dns.domain }}. (
+                  6     ; Serial
+             604800     ; Refresh
+              86400     ; Retry
+            2419200     ; Expire
+             604800     ; Negative Cache TTL
+)
+
+; name servers - NS records
+    IN      NS      {{ valet.name }}.{{ dns.domain }}.
+
+; name servers - PTR records
+{{ valet.ip.split('.')[3] }}    IN    PTR    {{ valet.name }}.{{ dns.domain }}.
+
+; OpenShift Container Platform Cluster - PTR records
+{{ bootstrap_node.ip.split('.')[3] }}    IN    PTR    {{ bootstrap_node.name}}.{{ dns.clusterid }}.{{ dns.domain }}.
+{% for mst in master_nodes %}
+{{ mst.ip.split('.')[3] }}    IN    PTR    {{ mst.name }}.{{ dns.clusterid}}.{{ dns.domain }}.
+{% endfor %}
+{% for wrk in worker_nodes %}
+{{ wrk.ip.split('.')[3] }}    IN    PTR    {{ wrk.name }}.{{ dns.clusterid}}.{{ dns.domain }}.
+{% endfor %}
+{{ valet.ip.split('.')[3] }}    IN    PTR    api.{{ dns.clusterid}}.{{ dns.domain }}.
+{{ valet.ip.split('.')[3] }}    IN    PTR    api-int.{{ dns.clusterid}}.{{ dns.domain }}.

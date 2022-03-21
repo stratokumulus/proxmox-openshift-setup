@@ -1,0 +1,10 @@
+default menu.c32   
+ prompt 1
+ timeout 9
+ ONTIMEOUT 1   
+ menu title OKD installation 
+ label 1  
+ menu label ^1) Master node
+ menu default
+ kernel fcos/kernel
+ append initrd=fcos/initramfs.img nomodeset rd.neednet=1 console=tty0 console=ttyS0 ip=dhcp coreos.inst=yes coreos.inst.install_dev=/dev/sda coreos.live.rootfs_url=http://{{ valet.ip }}:8080/okd4/rootfs.img coreos.inst.ignition_url=http://{{ valet.ip }}:8080/okd4/master.ign

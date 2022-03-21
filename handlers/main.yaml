@@ -1,0 +1,20 @@
+---
+- name: Restart DNS
+  service:
+    name: named
+    state: restarted
+
+- name: Restart FW
+  service:
+    name: firewalld
+    state: restarted
+
+- name: Restart TFTP
+  service:
+    name: tftp
+    state: restarted
+
+- name: Restart DHCP
+  service:
+    name: dhcpd
+    state: restarted

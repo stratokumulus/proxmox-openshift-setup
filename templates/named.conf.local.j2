@@ -1,0 +1,9 @@
+zone "{{ dns.domain }}" {
+    type master;
+    file "/etc/named/zones/db.forward"; 
+};
+
+zone "{{ valet.ip.split('.')[2] }}.{{ valet.ip.split('.')[1] }}.{{valet.ip.split('.')[0] }}.in-addr.arpa" {
+    type master;
+    file "/etc/named/zones/db.reverse";  
+};

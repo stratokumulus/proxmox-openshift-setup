@@ -1,0 +1,38 @@
+{# DNS reverse zone file #}
+$TTL    604800
+@       IN      SOA     {{ valet.name }}.{{ dns.domain }}. admin.{{ dns.domain }}. (
+                  1     ; Serial
+             604800     ; Refresh
+              86400     ; Retry
+            2419200     ; Expire
+             604800     ; Negative Cache TTL
+)
+
+; name servers - NS records
+    IN      NS      {{ valet.name }}
+
+; name servers - A records
+{{ valet.name }}.{{ dns.domain }}.                IN      A       {{ valet.ip }}
+; OpenShift Container Platform Cluster - A records
+{{ bootstrap_node.name }}.{{ dns.clusterid }}.{{ dns.domain }}.           IN      A      {{ bootstrap_node.ip }}
+{% for machine in  master_nodes %}
+{{ machine.name }}.{{ dns.clusterid }}.{{ dns.domain }}.     IN      A      {{ machine.ip }}
+{% endfor %}
+{% for machine in worker_nodes %}
+{{ machine.name }}.{{ dns.clusterid }}.{{ dns.domain }}.     IN      A      {{ machine.ip }}
+{% endfor %}
+
+; OpenShift internal cluster IPs - A records
+api.{{ dns.clusterid }}.{{ dns.domain }}.       IN    A    {{ valet.ip }}
+api-int.{{ dns.clusterid }}.{{ dns.domain }}.   IN    A    {{ valet.ip }}
+*.apps.{{ dns.clusterid }}.{{ dns.domain }}.    IN    A    {{ valet.ip }}
+{% for machine in  master_nodes %}
+etcd-{{ loop.index0 }}.{{ dns.clusterid }}.{{ dns.domain }}.    IN    A     {{ machine.ip}}
+{% endfor %}
+console-openshift-console.apps.{{ dns.clusterid }}.{{ dns.domain }}.     IN     A     {{ valet.ip }}
+oauth-openshift.apps.{{ dns.clusterid }}.{{ dns.domain }}.               IN     A     {{ valet.ip }}
+
+; OpenShift internal cluster IPs - SRV records
+{% for machine in  master_nodes %}
+_etcd-server-ssl._tcp.{{ dns.clusterid }}.{{ dns.domain }}.    86400     IN    SRV     0    10    2380    etcd-{{ loop.index0 }}.{{ dns.clusterid }}.
+{% endfor %}

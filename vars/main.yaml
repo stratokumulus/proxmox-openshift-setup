@@ -1,0 +1,56 @@
+---
+main_dns: 192.168.1.1
+netw: 192.168.1
+dns:
+  domain: homelab.local
+  clusterid: okd
+okd:
+# [4.5]
+#   client: https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-07-29-070316/openshift-client-linux-4.5.0-0.okd-2020-07-29-070316.tar.gz
+#   install: https://github.com/openshift/okd/releases/download/4.5.0-0.okd-2020-07-29-070316/openshift-install-linux-4.5.0-0.okd-2020-07-29-070316.tar.gz
+#   image: https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/32.20200715.3.0/x86_64/fedora-coreos-32.20200715.3.0-metal.x86_64.raw.xz
+#   signature: https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/32.20200715.3.0/x86_64/fedora-coreos-32.20200715.3.0-metal.x86_64.raw.xz.sig
+# [4.8]
+#  client:    https://github.com/openshift/okd/releases/download/4.8.0-0.okd-2021-10-10-030117/openshift-client-linux-4.8.0-0.okd-2021-10-10-030117.tar.gz
+#  install:   https://github.com/openshift/okd/releases/download/4.8.0-0.okd-2021-10-10-030117/openshift-install-linux-4.8.0-0.okd-2021-10-10-030117.tar.gz
+#  kernel:    https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/34.20210626.3.1/x86_64/fedora-coreos-34.20210626.3.1-live-kernel-x86_64
+#  rootfs:    https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/34.20210626.3.1/x86_64/fedora-coreos-34.20210626.3.1-live-rootfs.x86_64.img
+#  initramfs: https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/34.20210626.3.1/x86_64/fedora-coreos-34.20210626.3.1-live-initramfs.x86_64.img
+# [4.10]
+  client: https://github.com/openshift/okd/releases/download/4.10.0-0.okd-2022-03-07-131213/openshift-client-linux-4.10.0-0.okd-2022-03-07-131213.tar.gz
+  install: https://github.com/openshift/okd/releases/download/4.10.0-0.okd-2022-03-07-131213/openshift-install-linux-4.10.0-0.okd-2022-03-07-131213.tar.gz
+  kernel:    https://builds.coreos.fedoraproject.org/prod/streams/testing/builds/35.20220116.2.0/x86_64/fedora-coreos-35.20220116.2.0-live-kernel-x86_64
+  rootfs:    https://builds.coreos.fedoraproject.org/prod/streams/testing/builds/35.20220116.2.0/x86_64/fedora-coreos-35.20220116.2.0-live-rootfs.x86_64.img
+  initramfs: https://builds.coreos.fedoraproject.org/prod/streams/testing/builds/35.20220116.2.0/x86_64/fedora-coreos-35.20220116.2.0-live-initramfs.x86_64.img
+jq_file: https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+user:
+  name: ansiblebot
+  home: /home/ansiblebot
+valet:
+  name: lab-valet
+  ip: 192.168.1.196
+  macaddr: 7A:00:00:00:03:08
+bootstrap_node:
+  name: lab-bootstrap
+  ip: 192.168.1.189
+  macaddr: 7A:00:00:00:03:07
+master_nodes:
+  - name: lab-ctrl-1
+    ip: 192.168.1.190
+    macaddr: 7A:00:00:00:03:01
+  - name: lab-ctrl-2
+    ip: 192.168.1.191
+    macaddr: 7A:00:00:00:03:02
+  - name: lab-ctrl-3
+    ip: 192.168.1.192
+    macaddr: 7A:00:00:00:03:03
+worker_nodes:
+  - name: lab-cmp-1
+    ip: 192.168.1.193
+    macaddr: 7A:00:00:00:03:04
+  - name: lab-cmp-2
+    ip: 192.168.1.194
+    macaddr: 7A:00:00:00:03:05
+  - name: lab-cmp-3
+    ip: 192.168.1.195
+    macaddr: 7A:00:00:00:03:06
