@@ -190,3 +190,4 @@ Prepare your system as explained above, then boot the FCOS image without any con
 ```
 coreos-installer install /dev/sda --ignition-url http://192.168.2.186:8080/okd4/[bootstrap|master|worker].ign --insecure-ignition
 ```
+
