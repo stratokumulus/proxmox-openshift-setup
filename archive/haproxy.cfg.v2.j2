@@ -49,9 +49,9 @@ frontend okd4_k8s_api_fe
 backend okd4_k8s_api_be
     balance source
     mode tcp
-    server      {{ bootstrap_node.name }} {{ bootstrap_node.ip }}:6443 check
+    server      {{ bootstrap_node.name }} {{ bootstrap_node.name }}.okd.homelab.local:6443 check
 {% for machine in  master_nodes %}
-    server      {{ machine.name }} {{ machine.ip }}:6443 check
+    server      {{ machine.name }} {{ machine.name }}.okd.homelab.local:6443 check
 {% endfor %}
 
 frontend okd4_machine_config_server_fe
@@ -63,10 +63,10 @@ frontend okd4_machine_config_server_fe
 backend okd4_machine_config_server_be
     balance source
     mode tcp
-    server      {{ bootstrap_node.name }} {{ bootstrap_node.ip }}:22623 check
+    server      {{ bootstrap_node.name }} {{ bootstrap_node.name }}.okd.homelab.local:22623 check
 
 {% for machine in  master_nodes %}
-    server      {{ machine.name }} {{ machine.ip }}:22623 check
+    server      {{ machine.name }} {{ machine.name }}.okd.homelab.local:22623 check
 {% endfor %}
 
 frontend okd4_http_ingress_traffic_fe
@@ -80,7 +80,7 @@ backend okd4_http_ingress_traffic_be
     mode tcp
 
 {% for machine in  worker_nodes %}
-    server      {{ machine.name }} {{ machine.ip }}:80 check
+    server      {{ machine.name }} {{ machine.name }}.okd.homelab.local:80 check
 {% endfor %}
 
 frontend okd4_https_ingress_traffic_fe
@@ -93,5 +93,5 @@ backend okd4_https_ingress_traffic_be
     balance source
     mode tcp
 {% for machine in  worker_nodes %}
-    server      {{ machine.name }} {{ machine.ip }}:443 check
+    server      {{ machine.name }} {{ machine.name }}.okd.homelab.local:80 check
 {% endfor %}

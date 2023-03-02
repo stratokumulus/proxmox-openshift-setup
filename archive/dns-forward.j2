@@ -32,4 +32,7 @@ etcd-{{ loop.index0 }}.{{ dns.clusterid }}.{{ dns.domain }}.    IN    A     {{ m
 console-openshift-console.apps.{{ dns.clusterid }}.{{ dns.domain }}.     IN     A     {{ valet.ip }}
 oauth-openshift.apps.{{ dns.clusterid }}.{{ dns.domain }}.               IN     A     {{ valet.ip }}
 
-
+; OpenShift internal cluster IPs - SRV records
+{% for machine in  master_nodes %}
+_etcd-server-ssl._tcp.{{ dns.clusterid }}.{{ dns.domain }}.    86400     IN    SRV     0    10    2380    etcd-{{ loop.index0 }}.{{ dns.clusterid }}.
+{% endfor %}

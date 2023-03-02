@@ -1,0 +1,73 @@
+default-lease-time 21600000;
+
+allow booting;
+allow bootp;
+
+subnet {{ network.lab_subnet }} netmask 255.255.255.0 {
+ range {{ network.lab_dhcp_start}} {{ network.lab_dhcp_stop }};
+ default-lease-time 21600000;
+ option broadcast-address {{ network.lab_broadcast }};
+ option routers {{ network.lab_router }};
+ option domain-name-servers {{ valet.ip }};
+}
+
+host lab-valet {
+ hardware ethernet {{ valet.macaddr}};
+ fixed-address {{ valet.ip }};
+ option domain-name-servers {{ network.home_dns }};
+ option routers {{ network.lab_router }};
+ option domain-name "{{ dns.clusterid }}.{{ dns.domain }}";
+}
+
+group {
+ next-server {{ valet.ip }};
+ option routers {{ network.lab_router }};
+ option domain-name-servers {{ valet.ip }};
+ option broadcast-address {{ network.lab_broadcast }};
+ option domain-name "{{ dns.clusterid }}.{{ dns.domain }}";
+
+ host {{ bootstrap_node.name }} {
+  hardware ethernet {{ bootstrap_node.macaddr }};
+  fixed-address {{ bootstrap_node.ip }};
+  filename "pxelinux.0";
+  option host-name "{{ bootstrap_node.name }}";
+  option domain-name "{{ dns.clusterid }}.{{ dns.domain }}";
+  ddns-hostname "bootstrap.{{ dns.clusterid }}.{{ dns.domain }}";
+ }
+ host {{ master_nodes[0].name }} {
+  hardware ethernet {{ master_nodes[0].macaddr }};
+  fixed-address {{ master_nodes[0].ip }};
+  filename "pxelinux.0";
+    option host-name "{{ master_nodes[0].name }}";
+ }
+ host {{ master_nodes[1].name }} {
+  hardware ethernet {{ master_nodes[1].macaddr }};
+  fixed-address {{ master_nodes[1].ip }};
+  filename "pxelinux.0";
+  option host-name "{{ master_nodes[1].name }}";
+ }
+ host {{ master_nodes[2].name }} {
+  hardware ethernet {{ master_nodes[2].macaddr }};
+  fixed-address {{ master_nodes[2].ip }};
+  filename "pxelinux.0";
+  option host-name "{{ master_nodes[2].name }}";
+ }
+ host {{ worker_nodes[0].name }} {
+  hardware ethernet {{ worker_nodes[0].macaddr }};
+  fixed-address {{ worker_nodes[0].ip }};
+  filename "pxelinux.0";
+  option host-name "{{ worker_nodes[0].name }}";
+ }
+ host {{ worker_nodes[1].name }} {
+  hardware ethernet {{ worker_nodes[1].macaddr }};
+  fixed-address {{ worker_nodes[1].ip }};
+  filename "pxelinux.0";
+  option host-name "{{ worker_nodes[1].name }}";
+ }
+ host {{ worker_nodes[2].name }} {
+  hardware ethernet {{ worker_nodes[2].macaddr }};
+  fixed-address {{ worker_nodes[2].ip }};
+  filename "pxelinux.0";
+  option host-name "{{ worker_nodes[2].name }}";
+ }
+}

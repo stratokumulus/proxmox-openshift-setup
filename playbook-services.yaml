@@ -1,6 +1,5 @@
 ---
-# First, let's make sure the hosts are properly named
-- name: Setup valet server
+- name: Setting up Linux server
   hosts: service
   vars_files:
     - vars/main.yaml
@@ -10,235 +9,158 @@
   become_method: sudo
   gather_facts: no
   tasks:
-  - name: wait 300 seconds max for kicking off the playbool, but start checking after 5 seconds
+  - name: Wait 300 seconds max for kicking off the playbook, but start checking after 5 seconds
     wait_for_connection:
       delay: 5
       timeout: 300
-  - name: set hostname
+  # First, let's make sure the hosts are properly named
+  - name: Set hostname
     hostname:
       name: "{{ new_hostname }}"
-  - name: no SELinux, thanks
+  # - name: set timezone to Europe/Brussels
+  #   timezone:
+  #     name: Europe/Brussels
+  - name: No SELinux, thanks
     ansible.posix.selinux:
       state: disabled
+
+  # No local firewall. You've been warned. If you need it, turn it back on afterwards, and ensure it still goes well.
+  - name: Stop local firewall
+    service:
+      # port: "{{ item }}"
+      # permanent: yes
+      name: firewalld
+      state: stopped
+
 #  Fix CentOS AppStream repo
-  - name: fix CentOS 8 AppStream repo in new releases
+  - name: Fix CentOS 8 AppStream repo in new releases
     shell: |
       sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
       sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
-  - name: create directories
+
+  - name: Create directories
     file: 
       path: "{{ item.name }}"
       state: directory
       owner: "{{ item.owner }}"
       mode: 0755          # For some reason, item.mode converts 0755 into 493 ... weird
     loop:
-      - { name: /var/www/html/okd4, owner: root, mode: 0755 }
-      - { name: /etc/named/zones, owner: root, mode: 0755 }
-      - { name: tmp, owner: ansiblebot, mode: 0755 }
-      - { name: install_dir, owner: ansiblebot, mode: 0755 }
-      - { name: /var/lib/tftpboot/fcos, owner: root, mode: 0755 }
-      - { name: /var/lib/tftpboot/pxelinux.cfg, owner: root, mode: 0755 }
-      - { name: /var/nfsshare/registry, owner: nobody, mode: 0777 } 
+      - { name: /var/www/html/okd4,             owner: root,        mode: 0755 }
+      - { name: /etc/named/zones,               owner: root,        mode: 0755 }
+      - { name: tmp,                            owner: ansiblebot,  mode: 0755 }
+      - { name: install_dir,                    owner: ansiblebot,  mode: 0755 }
+      - { name: /var/lib/tftpboot/fcos,         owner: root,        mode: 0755 }
+      - { name: /var/lib/tftpboot/pxelinux.cfg, owner: root,        mode: 0755 }
+      - { name: /var/nfsshare/registry,         owner: nobody,      mode: 0777 } 
+      - { name: /etc/dhcp,                      owner: root,        mode: 0755 } 
   
   # Need this here, just to make sure we have a working name resolution for packages installation
-  - name: overwrite resolv.conf
+  - name: Overwrite resolv.conf
     template:
       src:  templates/resolv.conf.j2
       dest: /etc/resolv.conf
       owner: root
       mode: 0644
-  - name: fix NetworkManager.cnf
+
+  - name: Fix NetworkManager.cnf
     lineinfile:
       path: /etc/NetworkManager/NetworkManager.conf
       insertafter: '[main]'
       line: 'dns=none'
     notify:
       - Restart DNS
-
-  # Setting up DNS
+  # I added this only for troubleshooting ... will remove
+  # - name: Add aliases
+  #   lineinfile: 
+  #     path: /home/ansiblebot/.bashrc
+  #     insertafter: EOF
+  #     line: "{{ item }}"
+  #   loop:
+  #     - alias ssb="ssh -i .ssh/ssh_okd core@192.168.2.189"
+  #     - alias ssm0="ssh -i ~/.ssh/ssh_okd core@192.168.2.190"
+  #     - alias ssm1="ssh -i ~/.ssh/ssh_okd core@192.168.2.191"
+  #     - alias ssm2="ssh -i ~/.ssh/ssh_okd core@192.168.2.192"
+  #     - alias ssw0="ssh -i ~/.ssh/ssh_okd core@192.168.2.193"
+  #     - alias ssw1="ssh -i ~/.ssh/ssh_okd core@192.168.2.194"
+  #     - alias ssw2="ssh -i ~/.ssh/ssh_okd core@192.168.2.195"   
+        
+  # Setting up DNS, HTTPD, HA Proxy, TFTPD
   - name: install bind, httpd, haproxy, tftp, dhcpd
     yum:
       state: present
       name:
       - bind       # "bind" for CentOS, "bind9" for Ubuntu
-      - bind-utils # "bind-utils" for CentOS, "bind9-utils" for Ubunut
+      - bind-utils # "bind-utils" for CentOS, "bind9-utils" for Ubuntu
       - httpd
       - haproxy
       - tftp-server 
       - dhcp-server
       - syslinux
-      - nfs-utils
+    
       update_cache: yes
 
-  # Build zone files 
-  - name: create dns files
+  # Build DNS configuration
+  - name: Create DNS config files
     template:
       src:  "{{ item.src }}"
       dest: "{{ item.dest }}"
       owner: root
       mode: 0644
     with_items:
-      - { src: templates/dns-forward.j2, dest: /etc/named/zones/db.forward }
-      - { src: templates/dns-reverse.j2, dest: /etc/named/zones/db.reverse }
-      - { src: templates/named.conf.j2, dest: /etc/named.conf }
-      - { src: templates/named.conf.local.j2, dest: /etc/named/named.conf.local }
-      - { src: templates/registry_pv.yaml.j2, dest: tmp}
-      - { src: templates/install-config.yaml.j2, dest: install_dir/install-config.yaml }
-      - { src: templates/haproxy.cfg.j2, dest: /etc/haproxy/haproxy.cfg}
-
-      # - { src: templates/pxe-bootstrap.j2, dest: /var/lib/tftpboot/pxelinux.cfg/pxe-bootstrap }
-      # - { src: templates/pxe-master.j2, dest: /var/lib/tftpboot/pxelinux.cfg/pxe-master }
-      # - { src: templates/pxe-worker.j2, dest: /var/lib/tftpboot/pxelinux.cfg/pxe-worker }
-      # - { src: files/dns/named.conf, dest: /etc/named.conf, own: root }
-      # - { src: files/dns/named.conf.local, dest: /etc/named/, own: root }
-
-  # - name: copy files 
-  #   copy: 
-  #     src: "{{ item.src }}"
-  #     dest: "{{ item.dest }}"
-  #     owner: "{{ item.own }}"
-  #     mode: 0644
-  #   with_items:
-      # - { src: "{{ dns.reverse }}", dest: /etc/named/zones/db.reverse, own: root}
-      # - { src: "{{ dns.forward }}", dest: /etc/named/zones/db.forward, own: root }
-      # - { src: files/dns/named.conf, dest: /etc/named.conf, own: root }
-      # - { src: files/dns/named.conf.local, dest: /etc/named/, own: root }
-      # - { src: files/haproxy.cfg, dest: /etc/haproxy/haproxy.cfg, own: root }
-#      - { src: files/install-config.yaml, dest: install_dir, own: ansiblebot }
-
+      - { src: templates/dns-forward.j2,          dest: /etc/named/zones/db.forward }
+      - { src: templates/dns-reverse.j2,          dest: /etc/named/zones/db.reverse }
+      - { src: templates/named.conf.j2,           dest: /etc/named.conf }
+      - { src: templates/named.conf.local.j2,     dest: /etc/named/named.conf.local }
+      - { src: templates/haproxy.cfg.j2,          dest: /etc/haproxy/haproxy.cfg }
+      - { src: templates/dhcpd.conf.j2,           dest: /etc/dhcp/dhcpd.conf }
+      - { src: templates/registry_pv.yaml.j2,     dest: tmp }
+      - { src: templates/install-config.yaml.j2,  dest: install_dir/install-config.yaml }
     notify:
     - Restart DNS
-    - Restart TFTP
-
-  - name: download various files
-    get_url:
-      url: "{{ item.src }}"
-      dest: "{{ item.dest }}" 
-      mode: 0644
-    with_items:
-      - { src: "{{ okd.client }}", dest: tmp/client.tar.gz }
-      - { src: "{{ okd.install }}", dest: tmp/install.tar.gz }
-      - { src: "{{ okd.kernel }}", dest: tmp/kernel }
-      - { src: "{{ okd.rootfs }}", dest: tmp/rootfs.img }
-      - { src: "{{ okd.initramfs }}", dest: tmp/initramfs.img }
-      - { src: "{{ jq_file }}", dest: tmp/jq }
-
-  # I don't like the way I'm doing this ... But I'll first make it work, then clean it
-  - name: keygen
-    # shell: |
-    #   ssh-keygen -q -t rsa -f /home/ansiblebot/.ssh/ssh_okd -C "ansiblebot@okd-valet" -N ""
-    #   chown ansiblebot: /home/ansiblebot/.ssh/ssh_okd*
-    community.crypto.openssh_keypair:
-      path: /home/ansiblebot/.ssh/ssh_okd
-      #onwer: ansiblebot
-  # Haven't yet found a way to do this properly :/ 
-  # - name: fetch key 
-  #   fetch:
-  #     src: .ssh/id_ssh_rsa.pub
-  #     dest: files/id_ssh_rsa.pub
-  #     flat: yet
-
-  - name: get remote file contents
-    command: "cat '{{ user.home }}'/.ssh/ssh_okd.pub"
-    register: key
-
-  - name: extract and copy the oc/k8s binaries
-    shell: |
-      cd tmp
-      tar -xzvf install.tar.gz
-      rm install.tar.gz
-      strip openshift-install               # I like my binaries not bloated, thanks
-      mv openshift-install /usr/local/bin/
-      tar -xzvf client.tar.gz 
-      rm client.tar.gz
-      strip kubectl
-      mv oc kubectl /usr/local/bin/
-      cp kernel /var/lib/tftpboot/fcos
-      cp initramfs.img /var/lib/tftpboot/fcos
-      cp rootfs.img /var/www/html/okd4
-      cp -rvf /usr/share/syslinux/* /var/lib/tftpboot
-#     cp fcos.raw.* /var/www/html/okd4/
-
-  - name: build install-config.yaml
-    vars:
-      sshkey: "{{ key.stdout }}"
-    lineinfile:
-      path: install_dir/install-config.yaml
-      regexp: '^sshKey:'
-      line: "sshKey: '{{ sshkey }}' " 
-      backup: yes
-
-  - name: create the install files
-    shell: |
-      /usr/local/bin/openshift-install create manifests --dir=install_dir/
-      cp install_dir/install-config.yaml install-config.back
-      sed -i 's/mastersSchedulable: true/mastersSchedulable: False/' install_dir/manifests/cluster-scheduler-02-config.yml
-      /usr/local/bin/openshift-install create ignition-configs --dir=install_dir/
-
-  # Could do the same with the pull secret
-
-  - name: copy all files to www directories
-    shell: cp -R /home/ansiblebot/install_dir/* /var/www/html/okd4/
-
-  - name: change www ownership
-    file: 
-      path: /var/www/html/okd4/
-      recurse: yes 
-      state: directory
-      owner: apache
-      group: apache
-      mode: 0755
-
-  - name: change install_dir ownership
-    file: 
-      path: /home/ansiblebot/install_dir
-      recurse: yes 
-      state: directory
-      owner: ansiblebot
-      group: ansiblebot
-      mode: 0755
+    - Restart TFTP    # May not be necessary
+    - Restart DHCP
+  
 
 # Firewall ports to open
-  - name: open firewall ports
-    firewalld:
-      port: "{{ item }}"
-      permanent: yes
-      state: enabled
+  # - name: Stop local firewall
+  #   firewalld:
+  #     # port: "{{ item }}"
+  #     # permanent: yes
+  #     state: stopped
     # I'm not collecting facts yet ... 
     #when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
-    loop:
-      - 53/udp      # DNS
-      - 69/tcp      # Troubleshooting some issues, shouldn't be necessary 
-      - 80/tcp      # HTTP
-      - 111/tcp
-      - 111/udp		# NFS
-      - 443/tcp     # HTTPS
-      # - 635/tcp
-      # - 635/udp
-      - 4011/udp
-      - 4011/tcp
-      - 6443/tcp 
-      - 8080/tcp
-      - 22623/tcp
-    notify:
-      - Restart FW
+    # loop:
+    #   - 53/udp      # DNS
+    #   - 69/tcp      # Troubleshooting some issues, shouldn't be necessary 
+    #   - 80/tcp      # HTTP
+    #   - 111/tcp
+    #   - 111/udp		# NFS
+    #   - 443/tcp     # HTTPS
+    #   # - 635/tcp
+    #   # - 635/udp
+    #   - 4011/udp
+    #   - 4011/tcp
+    #   - 6443/tcp 
+    #   - 8080/tcp
+    #   - 22623/tcp
+    # notify:
+    #   - Restart FW
 
-  - name: open firewall services
-    firewalld:
-      service: "{{ item }}"
-      permanent: yes
-      state: enabled
-    loop:
-      - nfs
-      - rpc-bind
-      - mountd
-      - tftp
-    notify:
-      - Restart FW
+  # - name: open firewall services
+  #   firewalld:
+  #     service: "{{ item }}"
+  #     permanent: yes
+  #     state: enabled
+  #   loop:
+  #     - nfs
+  #     - rpc-bind
+  #     - mountd
+  #     - tftp
+  #   notify:
+  #     - Restart FW
 
   # Run it more than once, and it'll add 80 ... and 80 ... 
   - name: change httpd port
-    # shell: 
     lineinfile:
       path: /etc/httpd/conf/httpd.conf
       regexp: '^Listen.*80'
@@ -256,22 +178,127 @@
       - haproxy
       - httpd 
       - tftp
-      - nfs-server
+      # - nfs-server
+      - dhcpd
 #      - rpcbind
 
-  - name: create PXE files
-    template:
-      src: templates/pxe-{{ item.role }}.j2
-      dest: "/var/lib/tftpboot/pxelinux.cfg/01-{{ item.macaddr | lower | regex_replace (':', '-')}}"    # lower ?
-      mode: 0555
-    with_items: 
-    # Todo : MAKE THIS DANG LIST FRACKING GENERIC !!! 
-      - { macaddr: "{{ bootstrap_node.macaddr }}", role: bootstrap}
-      - { macaddr: "7A:00:00:00:03:01", role: master}
-      - { macaddr: "7A:00:00:00:03:02", role: master}
-      - { macaddr: "7A:00:00:00:03:03", role: master}
-      - { macaddr: "7A:00:00:00:03:04", role: worker}
-      - { macaddr: "7A:00:00:00:03:05", role: worker}
-      - { macaddr: "7A:00:00:00:03:06", role: worker}
-    notify:
-      - Restart TFTP
+
+
+- name: Setup OKD services
+  hosts: service
+  vars_files:
+    - vars/main.yaml
+  handlers:
+    - import_tasks: handlers/main.yaml
+  become: yes
+  become_method: sudo
+  gather_facts: no
+  tasks:
+ 
+    # Let's download the right files for our version of OKD
+    - name: Download OKD files
+      get_url:
+        url: "{{ item.src }}"
+        dest: "{{ item.dest }}" 
+        mode: 0644
+      with_items:
+        - { src: "{{ okd.client }}",    dest: tmp/client.tar.gz }
+        - { src: "{{ okd.install }}",   dest: tmp/install.tar.gz }
+        - { src: "{{ okd.kernel }}",    dest: tmp/kernel }
+        - { src: "{{ okd.rootfs }}",    dest: tmp/rootfs.img }
+        - { src: "{{ okd.initramfs }}", dest: tmp/initramfs.img }
+        - { src: "{{ jq_file }}",       dest: tmp/jq }
+
+    - name: Extract and copy the OKD binaries (oc, kubectl, openshift-install)
+      shell: |
+        cd tmp
+        tar -xzvf install.tar.gz
+        rm install.tar.gz
+        strip openshift-install               # I like my binaries not bloated, thanks
+        mv openshift-install /usr/local/bin/
+        tar -xzvf client.tar.gz 
+        rm client.tar.gz
+        strip kubectl
+        mv oc kubectl /usr/local/bin/
+        cp kernel /var/lib/tftpboot/fcos
+        cp initramfs.img /var/lib/tftpboot/fcos
+        cp rootfs.img /var/www/html/okd4
+        cp -rvf /usr/share/syslinux/* /var/lib/tftpboot
+ # Generating the key that will be used by OKD to communicate will all nodes.
+    - name: keygen
+      community.crypto.openssh_keypair:
+        path: /home/ansiblebot/.ssh/ssh_okd
+        owner: ansiblebot
+
+    - name: get remote file contents
+      command: "cat '{{ user.home }}'/.ssh/ssh_okd.pub"
+      register: key
+
+    - name: Add SSH key to install-config.yaml
+      vars:
+        sshkey: "{{ key.stdout }}"
+      lineinfile:
+        path: /home/ansiblebot/install_dir/install-config.yaml
+        regexp: '^sshKey:'
+        line: "sshKey: '{{ sshkey }}' " 
+        backup: yes
+
+    # Get the pull secret from ~/pull_secret.txt. If you don't have one, create the file and add '{"auths":{"fake":{"auth": "bar"}}}' as the content
+    - name: Add Pull Secret to install-config.yaml
+      vars:
+        pull: "{{ lookup('file', './files/pull_secret.txt') }}"
+      lineinfile: 
+        path: /home/ansiblebot/install_dir/install-config.yaml
+        regexp: '^pullSecret:'
+        # To make sure you don't run into escaping quotes, double quotes... 
+        #just make sure your pull secret in the file is between single quotes, and double quotes everywhere else :!env_var 
+        # For instance: '{"auths":{"fake":{"auth": "bar"}}}'
+        line: "pullSecret: {{ pull }}"   
+        backup: yes
+
+    # Let's create the proper OKD installation files (ignition, manifests, ...)
+    - name: Create the install files
+      shell: |
+        /usr/local/bin/openshift-install create manifests --dir=/home/ansiblebot/install_dir/
+        cp /home/ansiblebot/install_dir/install-config.yaml /home/ansiblebot/install-config.back
+        sed -i 's/mastersSchedulable: true/mastersSchedulable: False/' /home/ansiblebot/install_dir/manifests/cluster-scheduler-02-config.yml
+        /usr/local/bin/openshift-install create ignition-configs --dir=/home/ansiblebot/install_dir/
+
+    # Make these files available on the Web server
+    - name: Copy all files to www directories
+      shell: cp -R /home/ansiblebot/install_dir/* /var/www/html/okd4/
+
+    - name: Change www ownership
+      file: 
+        path: /var/www/html/okd4/
+        recurse: yes 
+        state: directory
+        owner: apache
+        group: apache
+        mode: 0755
+
+    - name: Change install_dir ownership
+      file: 
+        path: /home/ansiblebot/install_dir
+        recurse: yes 
+        state: directory
+        owner: ansiblebot
+        group: ansiblebot
+        mode: 0755
+
+    - name: create PXE files
+      template:
+        src: templates/pxe-{{ item.role }}.j2
+        dest: "/var/lib/tftpboot/pxelinux.cfg/01-{{ item.macaddr | lower | regex_replace (':', '-')}}"    # lower ?
+        mode: 0555
+      with_items: 
+      # Todo : MAKE THIS DANG LIST FRACKING GENERIC !!! 
+        - { macaddr: "{{ bootstrap_node.macaddr }}", role: bootstrap}
+        - { macaddr: "{{ master_nodes[0].macaddr }}", role: master}
+        - { macaddr: "{{ master_nodes[1].macaddr }}", role: master}
+        - { macaddr: "{{ master_nodes[2].macaddr }}", role: master}
+        - { macaddr: "{{ worker_nodes[0].macaddr }}", role: worker}
+        - { macaddr: "{{ worker_nodes[1].macaddr }}", role: worker}
+        - { macaddr: "{{ worker_nodes[2].macaddr }}", role: worker}
+      notify:
+        - Restart TFTP

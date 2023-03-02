@@ -6,7 +6,7 @@ metadata:
 compute:
 - hyperthreading: Enabled
   name: worker
-  replicas: 0
+  replicas: 3
 
 controlPlane:
   hyperthreading: Enabled
@@ -14,17 +14,17 @@ controlPlane:
   replicas: 3
 
 networking:
+  machineNetwork:
+  - cidr: 192.168.2.0/24    # May not be necessary, but it's a left over from my tests ... will
   clusterNetwork:
   - cidr: 10.128.0.0/14 
     hostPrefix: 23 
-  networkType: OpenShiftSDN
+  networkType: OVNKubernetes
   serviceNetwork: 
   - 172.30.0.0/16
 
 platform:
   none: {}
 
-fips: false
-
-pullSecret: '{"auths":{"fake":{"auth": "bar"}}}' 
+pullSecret: "{'auths':{'fake':{'auth': 'bar'}}}"
 sshKey: 'ssh-ed25519 AAAA...'   

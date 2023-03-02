@@ -5,7 +5,7 @@ variable "api_url" {
 
 variable "user" {
   description = "Name of the admin account to use"
-  default     = "terraform-prov@pve"
+  default     = "terraform@pve"
 }
 
 variable "passwd" {
@@ -25,3 +25,14 @@ variable "lxc_passwd" {
   sensitive   = true
 }
 
+variable "token_id" {
+  description = "The token created for a user in Proxmox"
+  type        = string
+  sensitive   = true
+}
+
+variable "token_secret" {
+  description = "The secret created for a user's token in Proxmox"
+  type        = string
+  sensitive   = true
+}
