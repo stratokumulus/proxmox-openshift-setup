@@ -1,0 +1,15 @@
+[service]
+${ service_ip }
+
+[bootstrap]
+${ bootstrap_ip }
+
+[masters]
+%{ for i in masters ~}
+${ i } 
+%{ endfor ~}
+
+[workers]
+%{ for i in workers ~}
+${ i }
+%{ endfor ~}

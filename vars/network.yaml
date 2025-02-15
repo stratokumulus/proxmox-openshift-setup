@@ -1,0 +1,14 @@
+#
+domain: homelab.local
+clusterid: okd
+resolver: 192.168.1.4
+bridge: vmbr1
+vlan: 2
+home_subnet: 192.168.1.0/24
+lab_cidr: 192.168.2.0/24
+network_type: OVNKubernetes #Cilium
+lab_subnet: 192.168.2.0
+lab_dhcp_start: 192.168.2.100
+lab_dhcp_stop: 192.168.2.150
+lab_broadcast: 192.168.2.255
+lab_gw: 192.168.2.1

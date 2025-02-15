@@ -18,3 +18,13 @@
   service:
     name: dhcpd
     state: restarted
+
+- name: Stop FW
+  service:
+    name: firewalld
+    state: stopped
+
+- name: Start TFTP
+  service:
+    name: tftp
+    state: started

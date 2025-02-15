@@ -1,8 +1,6 @@
-# Deploying OpenShift 4.12 with Terraform and Ansible on Proxmox
-
-(tested with OKD 4.12.0 02-04 and 02-18)
-
-First of all : if you're deploying this as-is in production, you're going to run into security problems. Guaranteed. This below is a lab setup, made to install and learn OpenShift in a lab environment. I'm doing dumb stuff, like turning off SELinux, and turning the host firewall off. So yeah, don't try this at work, kids. And I take no responsibility if you're having security issues. 
+# Deploying OKD 4.17 with Terraform and Ansible on Proxmox
+ 
+First of all : if you're deploying this as-is in production, you're going to run into security problems. Guaranteed. This below is a lab setup, made to install and learn OpenShift/OKD in a lab environment. I'm doing dumb stuff, like turning off SELinux, and turning the host firewall off. So yeah, don't try this at work, kids. And I take no responsibility if you're having security issues. 
 
 Also, before anyone wants to yell at me that my code suck : yes. Yes, it does. Like every normal coder exploring stuff, I first made it work. And now I'm gradually improving it. My Ansible playbook has several "shell:" sections ! Yikes ! 
 
@@ -12,29 +10,38 @@ I can say that a lot of VM died while I worked on this automated deployment. Bef
 
 Deploy the VMs, fire up the "service" machine, run the ansible playbook. Then fire up the bootstrap node. Then fire up the 3 master nodes. Once they're all up and running (you can see them as "ready" in the "oc get nodes" outputs), stop the bootstrap node, remove references to this node in the haproxy config, restart haproxy, and fire up the worker nodes. They'll get stuck after the 3rd boot, so approve all the certificates to "unstuck" them. Done !
 
+## Major changes from the last push
+
+I did change quite a few things : 
+- the nodes are now described in a YAML file
+- I'm using a Cent0S 10 cloud-init setup
+
 ### Setting things up
 
 We will need the following : 
-- A Proxmox server that can run 7 VMs, for a minimum of 22 CPUs, 112GB of RAM
+- A Proxmox server that can run 8 VMs (the temporary bootstrap, the control plane nodes, and the worker ones). I give them 16GB and 4 CPUs each 
 - (Optional) A dedicated subnet/VLAN (I used VLAN2 in my config : vmbr1, tag2 - it allows me to mess with a DHCP/DNS config without impacting my main network)
-- A template of a CentOS server to clone, created with an ansible user (`ansiblebot` for me), which has sudo privileges with no passwords. Named `a2cent` on my proxmox.
+- A CentOS cloudinit template to clone
 - A template of a PXE boot client to clone - no OS, it'll be provided by the PXE boot (not necessary though, the VMs could be created on the fly wihout cloning). Named `pxe-client` on my proxmox.
 - A resource pool (aka a folder) to show all Openshift VMs in a single view. Not mandatory, but my code uses it.
 
-(The next 4 will run on the "service" host : )
-- a DHCP server (with reservations, for ease of use)
+(The next 3 will run on the "service" host : )
 - a DNS server
 - a TFTP server (to boot machines using PXE)
 - a Web server (for accessing the ignition files)
 
-- a pull secret in "./files/pull_secret.txt". If you don't have a pull secret, either get one from RedHat, or use '{"auths":{"fake":{"auth": "bar"}}}' as the file content - note the single quotes surrounding the whole string !
+- a pull secret in "./files/pull_secret.txt". If you don't have a pull secret, either get one from RedHat, or use '{"auths":{"fake":{"auth": "aWQ6cGFzcwo="}}}' as the file content - note the single quotes surrounding the whole string !
 - (Optional) A kitten happily sleeping in a box on your desk.
 
 ![center](./files/okd-openshift.png)
 
+Optionnally, you can also create the DHCP server on the service node (which is what I used to do, by I'm doing this on another server nowadays)
+
 ### The hosts 
 
-I hardcoded private MAC addresses for my VMs. The way to make a private (unicast) MAC address is to have the least significant bit not set, and the second-least significant bit of the most significant byte set. So, the 8 bits of the first byte in the MAC address must be `xxxxxx10`. So for instance, x2 would work (`00000010`). x3 wouldn't (`00000011`) x4 wouldn't either (`00000100`). x6 would work. x8 wouldn't. xA would work. xC wouldn't. xE would work. xG wouldn't, but for a totally different reason :D (xOxO only works if we're intimate enough). 
+I hardcoded *private* MAC addresses for my VMs. The way to make a private (unicast) MAC address is to have the least significant bit not set, and the second-least significant bit of the most significant byte set. So, the 8 bits of the first byte in the MAC address must be `xxxxxx10`. So for instance, x2 would work (`xxxxxx10`). x3 wouldn't (`xxxxxx11`) x4 wouldn't either (`xxxxx100`). x6 would work. x8 wouldn't. xA would work. xC wouldn't. xE would work. xG wouldn't, but for a totally different reason :D (xOxO only works if we're intimate enough). 
+
+So I'm chosing 7A (1111010) for the first byte. All my labs that require a private MAC address are in my 7A: scope. 
 
 | Name | IP | Mac Address | Role | OS | PXE Boot |
 |------|---------------|--------------------|------------------------------------|---------------------|-----|
@@ -47,15 +54,14 @@ I hardcoded private MAC addresses for my VMs. The way to make a private (unicast
 | bootstrap | 192.168.2.189 | 7A:00:00:00:03:07 | Bootstrap, needed to start the cluster | FCOS | Yes |
 | service | 192.168.2.196 | 7A:00:00:00:03:08 | DNS, DHCP, Load balancer, web server | Ubuntu 20/CentOS | No |
 
-Please note that the `hosts.ini` file has these IP addresses hardcoded. I could make this generic, by creating another playbook, using the localhost connection, to generate the IP addresses. Or use Terraform to generate it. Or let the user do this part of the config manually. Laziness won, you'll have to adapt it yourself ! You will also need to assign the service host its static IP address. The reason I'm not using my main network DHCP server is that it doesn't allow hostnames to be sent as part of the DHCP conversation. And this installation is super tricky when it comes to DNS ... 
+The `hosts.ini` will be created based on the static IP addresses. I went the full dynamic route, only to get hit by some funky errors in the Proxmox terraform provider, which always used the same two VM IDs (for 8 nodes, doesn't help), and another annoying bug that forced me to got the static route until all this gets fixed.
 
 ### The configuration
 
 The following services will be configured and started on the service host:  
 
-- the DHCP server, for static IP reservation of the VMs, along with a few options (like a TFTP server address pointing to the TFTP server, convenientely hosted for me on the same service host), 
-- a DNS server, also pointing to the service host IP address (I'm using PiHole in my main network , so I added the openshift domain name in the PiHole `dnsmasq.d/custom.conf` to forward all queries related to my OKD installation from PiHole directly to the service server).
-- a TFTP server, to provide PXE boot, and get the hosts to boot with the FCOS image (downloaded by the playbook). 
+- a DNS server, also pointing to my main resolver (I'm using PiHole in my main network, so I added the openshift *.apps.<cluserid><domain name> in the PiHole `dnsmasq.d/custom.conf` to forward all queries related to my OKD installation from PiHole directly to the service server).
+- a TFTP server, to provide PXE boot, and get the hosts to boot with the FCOS image (downloaded by the playbook). Configured in the DHCP config for Network boot. 
 - an HA Proxy, for ... proxying ... in high availability I guess ?
 
 ## How it works - the workflow
@@ -70,7 +76,7 @@ terraform apply
 
 Once done, run 
 ```
-ansible-playbook playbook-services.yaml
+ansible-playbook setup-linux.yaml
 ```
 
 Once successful, start the bootstrap VM. I usually wait for it to get to the first login screen, and then start the master nodes. I then SSH to the services host, and run 
@@ -98,7 +104,8 @@ Aftert 2 or 3 reboots, the worker nodes will appear to get stuck. It means that 
 ```
 oc get csr | grep Pending
 ```
-For me, I had 9 certificates in Pending state (for 3 worker nodes). Approve them all at once : 
+
+I had 6 then 3 certificates in Pending state (for 3 worker nodes). Approve them all until you have none pending: 
 
 ```
 oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
@@ -110,7 +117,7 @@ Then wait for all cluster operators to be properly started :
 watch -n 5 oc get co
 ```
 
-TookIt takes about 50m for the whole environment to be deployed, from the moment I run the playbook. But your mileage may vary.
+It takes about 50m for the whole environment to be deployed, from the moment I run the playbook. But your mileage may vary.
 
 Wait for the command `openshift-install wait-for install-complete ...` to finish, as it will give you the info you need to connect to your cluster (like the random password for the kubeadmin account).
 
@@ -118,42 +125,18 @@ Enjoy !
 
 ## Todo
 
-- [ ] Create a generic /etc/resolv.conf file, based on J2 file and variables
-- [ ] Generate the hosts.ini based on the IP addresses defined in vars/main.yaml
-- [ ] Remove the NOPASSWD config for the ansiblebot user at the end of the playbook
-- [ ] Make the playbook Ubuntu/CentOS agnostic 
-- [ ] Finish post-install config
-- [ ] Remove shell commands in the playbook
-- [ ] Create the template image using packer (and get rid of "ansiblebot" user in favor of "ansible")
-- [ ] Remove the machineNetwork from the install-config.yaml.j2 file, as this points to my own lab, and may not even be necessary
-- [ ] Cache OKD files on the local machine. Not useful when you only run things once, but when you're troubleshooting, it speeds up things (it's the longest part of the playbook, so would make sense ... )
-
-## Monitoring deployment status
-
-Check openshift deployment progress from the services host : 
-```
-openshift-install --dir=install_dir/ wait-for bootstrap-complete --log-level=info
-```
-
-From then on, use "export KUBECONFIG=~/install_dir/auth/kubeconfig" to access the cluster and run the oc command. 
-
-After starting the worker nodes:
-```
-openshift-install --dir=install_dir/ wait-for install-complete --log-level=info
-```
-
-This command will give you the URL, username and password to access the web console. 
-
-In another window, I like to watch the progress of the config of the cluster operators by running 
-```
-watch -n 5 oc get co
-```
-It took about 50 minutes for me from the start of the playbook to the completed installation message.
+- [ ] Fire up the bootstrap node at the end of the Linux setup
+- [ ] Catch up the "bootstrap finished" message to fire up the work nodes automatically
+- [ ] Run the approval command automatically when a CSR is in Pending state
+- [ ] Remove as many shell commands in the playbook as possible
+- [ ] Cache OKD files on a local machine. Not useful when you only run things once, but when you're troubleshooting, it speeds up things (it's the longest part of the playbook, so would make sense ... )
 
 ## Troubleshooting
 
+It's the DNS. It's always the DNS. So check the DNS. And if it fails, recheck the DNS. Did I say to check the DNS ?
+(honestly, it's one of the most DNS-sensitive install I have ever played with)
+
 ### "Node not found" in worker nodes logs 
-### Certificate approval
 
 If you see error like "node worker0 not found" or something like that in the worker nodes logs, it means that the install of the workers went well, and it's now time to approve certificates :) Also, if you don't check the logs, but see that worker nodes are not ready, check first for the certificates in Pending state (same procedure for both cases):  
 
@@ -175,6 +158,9 @@ List supported images with current version of OpenShift:
 ```
 openshift-install coreos print-stream-json, and run grep for kernel, rootfs and initramfs
 ```
+
+But the list in the file `vars/okd-version.yaml` has it all for you already :) 
+
 ### Check openshift deployment progress from the bootstrap node
 Same for the master or worker nodes, just set the right IP address 
 ```
@@ -191,3 +177,47 @@ Prepare your system as explained above, then boot the FCOS image without any con
 coreos-installer install /dev/sda --ignition-url http://192.168.2.186:8080/okd4/[bootstrap|master|worker].ign --insecure-ignition
 ```
 
+### After a reboot of Proxmox, my cluster doesn't come back up
+
+Make sure the services server is up and running. Then, start all master nodes. Once booted, started the worker nodes. 
+
+Check if the firewall is still filtering traffic
+```
+systemctl stop firewalld
+```
+
+Check if the TFTP server is started
+```
+systemctl start tftp
+```
+
+Check if there are any pending certificates
+```
+oc get csr | grep Pending
+oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
+```
+
+
+### Other issues
+
+Check your DNS config. "It's always DNS" ! I cannot emphasize this enough : DNS is critical to get this mammoth working 
+
+I sometimes had to SSH to the bootstrap server, and add the okd-services server in /etc/hosts. Sucks. But worked. I should keep a "stable" VLAN and services for OKD, but hey, it's a lab :D 
+
+### List of commands I use when in troubleshooting mode
+
+Just so I can copy paste ... I will turn many of these into a post-install playbook to handle things all automatically
+``` 
+ssh root@192.168.1.101 "/usr/sbin/qm start 807"
+openshift-install --dir=install_dir/ wait-for bootstrap-complete --log-level=info
+ssh root@192.168.1.101 "/usr/sbin/qm start 801 && /usr/sbin/qm start 802 && /usr/sbin/qm start 803"
+ssh root@192.168.1.101 "/usr/sbin/qm stop 807"
+sudo systemctl restart haproxy
+sudo vi /etc/haproxy/haproxy.cfg 
+ssh root@192.168.1.101 "/usr/sbin/qm start 804 && /usr/sbin/qm start 805 && /usr/sbin/qm start 806"
+openshift-install --dir=install_dir/ wait-for bootstrap-complete --log-level=info
+openshift-install --dir=install_dir/ wait-for install-complete --log-level=info
+cp install_dir/auth/kubeconfig ~/.kube/config
+oc get csr | grep Pending
+oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
+```
