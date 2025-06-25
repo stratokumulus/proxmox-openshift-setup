@@ -21,59 +21,10 @@
       tags: ["os-config"]
     - import_tasks: tasks/downloads.yaml
       tags: ["download"]
-
-    # tasks/structure.yaml
-    # - name: Create directories
-    #   file:
-    #     path: "{{ item.name }}"
-    #     state: directory
-    #     owner: "{{ item.owner }}"
-    #     mode: 0755 # For some reason, item.mode converts 0755 into 493 ... weird
-    #   loop:
-    #     - { name: /var/www/html/okd4, owner: root, mode: 0755 }
-    #     - { name: /etc/named/zones, owner: root, mode: 0755 }
-    #     - { name: tmp, owner: ansible, mode: 0755 }
-    #     - { name: install_dir, owner: ansible, mode: 0755 }
-    #     - { name: /var/lib/tftpboot/fcos, owner: root, mode: 0755 }
-    #     - { name: /var/lib/tftpboot/pxelinux.cfg, owner: root, mode: 0755 }
-    #     - { name: /var/nfsshare/registry, owner: nobody, mode: 0777 }
-    #     - { name: /etc/dhcp, owner: root, mode: 0755 }
-
-    # # tasks/dns.yaml
-    # - name: Fix NetworkManager.cnf
-    #   lineinfile:
-    #     path: /etc/NetworkManager/NetworkManager.conf
-    #     insertafter: "[main]"
-    #     line: "dns=none"
-    #   notify:
-    #     - Restart DNS
-
-    # # Build DNS configuration
-    # - name: Create config files
-    #   template:
-    #     src: "{{ item.src }}"
-    #     dest: "{{ item.dest }}"
-    #     owner: root
-    #     mode: 0644
-    #   with_items:
-    #     - { src: templates/dns-forward.j2, dest: /etc/named/zones/db.forward }
-    #     - { src: templates/dns-reverse.j2, dest: /etc/named/zones/db.reverse }
-    #     - { src: templates/named.conf.j2, dest: /etc/named.conf }
-    #     - { src: templates/named.conf.local.j2, dest: /etc/named/named.conf.local }
-    #     - { src: templates/haproxy.cfg.j2, dest: /etc/haproxy/haproxy.cfg }
-    #     - { src: templates/registry_pv.yaml.j2, dest: tmp }
-    #     - { src: templates/install-config.yaml.j2, dest: install_dir/install-config.yaml }
-    #   notify:
-    #     - Restart DNS
-
     - import_tasks: tasks/dns-setup.yaml
       tags: ["dns"]
 
-    # --------
-    # - name: Pull secret checkpoint
-    #   ansible.builtin.pause:
-    #     prompt: "Go check the Ingress Load Balancer config file"
-
+    # This should go in a tasks ...
     # Run it more than once, and it'll add 80 ... and 80 ...
     - name: change httpd port
       lineinfile:
@@ -115,11 +66,6 @@
         dest: "{{ item.dest }}"
         mode: "{{ item.mode }}"
       with_items:
-        # - { src: files/client.tar.gz, dest: tmp/client.tar.gz, mode: 0644 }
-        # - { src: files/openshift-install, dest: /usr/local/bin/openshift-install, mode: "0755" }
-        # - { src: files/kernel, dest: tmp/kernel, mode: 0644 }
-        # - { src: files/rootfs.img, dest: tmp/rootfs.img, mode: 0644 }
-        # - { src: root/initramfs.img, dest: tmp/initramfs.img, mode: 0644 }
         - { src: "{{ jq_file }}", dest: tmp/jq, mode: "0644" }
 
     # This would be the perfect place to contact the registry server, and download the custom openshift-install
@@ -170,14 +116,6 @@
     #     - { src: "{{ jq_file }}", dest: tmp/jq, mode: 0644 }
     #   when: target == "ocp"
 
-    # - name: Extract OKD binaries (oc, kubectl) to /usr/local/bin
-    #   unarchive:
-    #     src: "{{ item.src }}"
-    #     dest: /usr/local/bin
-    #     remote_src: yes
-    #   loop:
-    #     - { src: "tmp/client.tar.gz" }
-
     - name: Copy image files to their proper location
       copy:
         remote_src: true
@@ -194,43 +132,8 @@
     - import_tasks: tasks/prepare-manifests.yaml
       tags: ["manifests"]
 
-    # # Let's create the proper OKD installation files (ignition, manifests, ...)
-    # - name: Create the cluster manifests
-    #   shell: |
-    #     cp /home/ansible/install_dir/install-config.yaml /home/ansible/install-config.back
-    #     /usr/local/bin/openshift-install create manifests --dir=/home/ansible/install_dir/
-
-    # - name: Setting mastersSchedulable to false
-    #   shell: |
-    #     sed -i 's/mastersSchedulable: true/mastersSchedulable: False/' /home/ansible/install_dir/manifests/cluster-scheduler-02-config.yml
-    #   when: masters_schedulable != true
-
-    # - name: Create ignition files
-    #   shell: /usr/local/bin/openshift-install create ignition-configs --dir=/home/ansible/install_dir/
-
     - import_tasks: tasks/prepare-webserver.yaml
       tags: ["web"]
-    # # Make these files available on the Web server
-    # - name: Copy all files to www directories
-    #   shell: cp -R /home/ansible/install_dir/* /var/www/html/okd4/
-
-    # - name: Change www ownership
-    #   file:
-    #     path: /var/www/html/okd4/
-    #     recurse: yes
-    #     state: directory
-    #     owner: apache
-    #     group: apache
-    #     mode: 0755
-
-    # - name: Change install_dir ownership
-    #   file:
-    #     path: /home/ansible/install_dir
-    #     recurse: yes
-    #     state: directory
-    #     owner: ansible
-    #     group: ansible
-    #     mode: 0755
 
     - import_tasks: tasks/bootstrap.yaml
       tags: ["bootstrap"]
