@@ -1,3 +1,4 @@
+.gitignore
 # Local .terraform directories
 **/.terraform/*
 
@@ -9,6 +10,13 @@
 *backup
 *back
 *orig
+.DS_Store
+docs
+plan
+templates/pihole-dns.j2
+templates/pihole-dnsmasq.j2
+templates/pxe-storage.j2
+tutu.yaml
 
 # Crash log files
 crash.log
@@ -40,4 +48,14 @@ override.tf.json
 terraform.rc
 .terraform.lock.hcl
 files/pull_secret.txt
+files/o*/*
+files/kubeconf*
+files/openshift-install*
+files/pull*secret*
+install_dir
+manifests
+files/ssl*
+.openshift*
+deploy-master
+
 
