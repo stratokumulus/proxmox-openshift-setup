@@ -1,12 +1,14 @@
 #
 domain: homelab.local
 clusterid: okd
-resolver: 192.168.1.4
+resolver: 192.168.1.5
+hypervisor: 192.168.1.101
 bridge: vmbr1
 vlan: 2
+masters_schedulable: false
 home_subnet: 192.168.1.0/24
 lab_cidr: 192.168.2.0/24
-network_type: OVNKubernetes #Cilium
+network_type: Cilium #or use OCK/OCP default, OVNKubernetes
 lab_subnet: 192.168.2.0
 lab_dhcp_start: 192.168.2.100
 lab_dhcp_stop: 192.168.2.150

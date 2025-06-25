@@ -1,0 +1,13 @@
+# Let's create the proper OKD installation files (ignition, manifests, ...)
+- name: Create the cluster manifests
+  shell: |
+    cp /home/ansible/install_dir/install-config.yaml /home/ansible/install-config.back
+    /usr/local/bin/openshift-install create manifests --dir=/home/ansible/install_dir/
+
+- name: Setting mastersSchedulable to false
+  shell: |
+    sed -i 's/mastersSchedulable: true/mastersSchedulable: False/' /home/ansible/install_dir/manifests/cluster-scheduler-02-config.yml
+  when: masters_schedulable != true
+
+- name: Create ignition files
+  shell: /usr/local/bin/openshift-install create ignition-configs --dir=/home/ansible/install_dir/

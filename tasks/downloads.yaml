@@ -1,0 +1,68 @@
+#Setting up DNS, HTTPD, HA Proxy, TFTPD on CentOS 10
+- name: Install packages
+  yum:
+    name: "{{ packages }}"
+    state: present
+    # enabled: yes
+  vars:
+    packages:
+      - bind # "bind" for CentOS, "bind9" for Ubuntu
+      - bind-utils # "bind-utils" for CentOS, "bind9-utils" for Ubuntu
+      - httpd
+      - haproxy
+      - tftp-server
+      # - kea # replaces old ISC DHCP server
+      - syslinux
+      - git
+
+- name: Download Cilium manifests
+  # Only if we're configuring Cilium by setting network_type in network.yaml accordingly
+  # This requires internet acces, please adapt accordingly if using a disconnected network
+  git:
+    repo: "{{ cilium_repo }}"
+    dest: tmp/cilium
+  when: network_type == "Cilium"
+
+- name: Copy Cilium manifest to install_dir/manifests
+  copy:
+    remote_src: true
+    src: "tmp/cilium/manifests/cilium.v{{ cilium_version }}/"
+    dest: install_dir/manifests/
+  when: network_type == "Cilium"
+
+- name: Download OKD files
+  get_url:
+    url: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode }}"
+  with_items:
+    - { src: "{{ versions[target][version].client }}", dest: tmp/client.tar.gz, mode: "0644" }
+    - { src: "{{ versions[target][version].install }}", dest: tmp/openshift-install.tar.gz, mode: "0755" }
+    - { src: "{{ versions[target][version].kernel }}", dest: tmp/kernel, mode: "0644" }
+    - { src: "{{ versions[target][version].rootfs }}", dest: tmp/rootfs.img, mode: "0644" }
+    - { src: "{{ versions[target][version].initramfs }}", dest: tmp/initramfs.img, mode: "0644" }
+
+- name: Extract OKD binaries (oc, kubectl)
+  unarchive:
+    src: "{{ item.src }}"
+    dest: tmp/
+    remote_src: yes
+  loop:
+    - { src: tmp/client.tar.gz }
+    - { src: tmp/openshift-install.tar.gz } # This may require specific treatment if we're using a disconnected envionrment
+
+- name: Copy OKD/OCP binaries to their proper location
+  copy:
+    remote_src: true
+    src: "{{ item.src }}"
+    dest: /usr/local/bin
+    mode: "755"
+  loop:
+    - src: tmp/oc
+    - src: tmp/kubectl
+    - src: tmp/openshift-install
+
+- name: Enable TFTPd
+  service:
+    name: tftp
+    enabled: yes

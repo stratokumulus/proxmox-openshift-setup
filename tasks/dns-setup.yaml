@@ -1,0 +1,26 @@
+# tasks/dns.yaml
+- name: Fix NetworkManager.cnf
+  lineinfile:
+    path: /etc/NetworkManager/NetworkManager.conf
+    insertafter: "[main]"
+    line: "dns=none"
+  notify:
+    - Restart DNS
+
+# Build DNS configuration
+- name: Create config files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    mode: 0644
+  with_items:
+    - { src: templates/dns-forward.j2, dest: /etc/named/zones/db.forward }
+    - { src: templates/dns-reverse.j2, dest: /etc/named/zones/db.reverse }
+    - { src: templates/named.conf.j2, dest: /etc/named.conf }
+    - { src: templates/named.conf.local.j2, dest: /etc/named/named.conf.local }
+    - { src: templates/haproxy.cfg.j2, dest: /etc/haproxy/haproxy.cfg }
+    - { src: templates/registry_pv.yaml.j2, dest: tmp }
+    - { src: templates/install-config.yaml.j2, dest: install_dir/install-config.yaml }
+  notify:
+    - Restart DNS

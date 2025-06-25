@@ -1,0 +1,32 @@
+# Generating the key that will be used by OKD/OCP to communicate will all nodes.
+- name: keygen
+  community.crypto.openssh_keypair:
+    path: /home/ansible/.ssh/ssh_openshift
+    owner: ansible
+
+- name: get remote file contents
+  command: "cat '{{ user.home }}'/.ssh/ssh_openshift.pub"
+  register: key
+
+- name: Add SSH key to install-config.yaml
+  vars:
+    sshkey: "{{ key.stdout }}"
+  lineinfile:
+    path: /home/ansible/install_dir/install-config.yaml
+    regexp: "^sshKey:"
+    line: "sshKey: '{{ sshkey }}' "
+    backup: yes
+
+# Get the pull secret from ~/pull_secret.txt. If you don't have one, create the file and add '{"auths":{"fake":{"auth": "bar"}}}' as the content
+# However, some specific images won't be available (for instance, those on connect.registry.redhat.com)
+# To make sure you don't run into escaping quotes, double quotes...
+# just make sure your pull secret in the file is between single quotes, and double quotes everywhere else :
+# For instance: '{"auths":{"fake":{"auth": "bar"}}}'
+- name: Add Pull Secret to install-config.yaml
+  vars:
+    pull: "{{ lookup('file', './files/pull_secret.txt') }}"
+  lineinfile:
+    path: /home/ansible/install_dir/install-config.yaml
+    regexp: "^pullSecret:"
+    line: "pullSecret: {{ pull }}"
+    backup: yes

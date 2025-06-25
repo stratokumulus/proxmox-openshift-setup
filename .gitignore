@@ -1,6 +1,6 @@
-.gitignore
 # Local .terraform directories
 **/.terraform/*
+
 
 # .tfstate files
 *.tfstate
@@ -16,7 +16,7 @@ plan
 templates/pihole-dns.j2
 templates/pihole-dnsmasq.j2
 templates/pxe-storage.j2
-tutu.yaml
+tut*.yaml
 
 # Crash log files
 crash.log
@@ -56,6 +56,8 @@ install_dir
 manifests
 files/ssl*
 .openshift*
-deploy-master
 
 
+
+.terraform
+.gitignore

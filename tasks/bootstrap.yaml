@@ -1,0 +1,23 @@
+- name: create bootstrap node PXE files
+  template:
+    src: templates/pxe-bootstrap.j2
+    dest: "/var/lib/tftpboot/pxelinux.cfg/01-{{ bootstrap.macaddr | lower | regex_replace (':', '-')}}" # lower ?
+    mode: 0555
+
+- name: create control plane nodes PXE files
+  template:
+    src: templates/pxe-master.j2
+    dest: "/var/lib/tftpboot/pxelinux.cfg/01-{{ item.macaddr | lower | regex_replace (':', '-')}}" # lower ?
+    mode: 0555
+  loop: "{{ masters | flatten(levels=1) }}"
+
+- name: create worker nodes PXE files
+  template:
+    src: templates/pxe-worker.j2
+    dest: "/var/lib/tftpboot/pxelinux.cfg/01-{{ item.macaddr | lower | regex_replace (':', '-')}}" # lower ?
+    mode: 0555
+  loop: "{{ workers | flatten(levels=1) }}"
+
+  notify:
+    - Start TFTP
+    # - Stop FW

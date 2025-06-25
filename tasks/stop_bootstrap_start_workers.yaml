@@ -1,0 +1,6 @@
+- name: Stop bootstrap node
+  shell: qm stop {{ bootstrap.vmid + vmbase }}
+
+- name: Start worker nodes
+  shell: qm start {{ item.vmid + vmbase }}
+  loop: "{{ workers }}"

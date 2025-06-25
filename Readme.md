@@ -1,37 +1,48 @@
-# Deploying OKD 4.17 with Terraform and Ansible on Proxmox
- 
+# Deploying OKD/OCP with Terraform and Ansible on Proxmox
+
+## TL;DR
+
+Configure what you need in the vars/*yaml files, run terraform, run Ansible, sit back, relax.
+
+## Some words of wisdom
+
 First of all : if you're deploying this as-is in production, you're going to run into security problems. Guaranteed. This below is a lab setup, made to install and learn OpenShift/OKD in a lab environment. I'm doing dumb stuff, like turning off SELinux, and turning the host firewall off. So yeah, don't try this at work, kids. And I take no responsibility if you're having security issues. 
 
 Also, before anyone wants to yell at me that my code suck : yes. Yes, it does. Like every normal coder exploring stuff, I first made it work. And now I'm gradually improving it. My Ansible playbook has several "shell:" sections ! Yikes ! 
 
-I can say that a lot of VM died while I worked on this automated deployment. Before I figured out where my main bug was, I probably started and killed the 8 VMs 10x a day, for many days in a row (*my haproxy was using port 80 to answer to queries on 443 ... this one has been a nightmare to figure out*).
+I can say that a lot of VMs died while I worked on this automated deployment. Every time I ran into an issue, I probably started and killed the 8 VMs 10x a day, for many days in a row.
 
-## TL;DR
+## Changelog, sort of ... 
 
-Deploy the VMs, fire up the "service" machine, run the ansible playbook. Then fire up the bootstrap node. Then fire up the 3 master nodes. Once they're all up and running (you can see them as "ready" in the "oc get nodes" outputs), stop the bootstrap node, remove references to this node in the haproxy config, restart haproxy, and fire up the worker nodes. They'll get stuck after the 3rd boot, so approve all the certificates to "unstuck" them. Done !
+Last push:
+- moved somes tasks from the main code to task files. Cleaner and easier to read, but functionnality stays the same
+- added tags, so that you can skip what you don't need (for instance, if you have an external DNS config and don't need to set it up, just run the playbook with `--skip dns`). More tags to come
 
-## Major changes from the last push
-
-I did change quite a few things : 
-- the nodes are now described in a YAML file
+Previous changes : 
+- the full install is now 100% hands free. The playbook will install all services and fire up the OKD/OCP nodes (as long as you're on Proxmox)
+- I've added the OCP config as well as the existing OKD. Chose you poison ... 
+- I've added a variable to select the version to install. 
+- Cilium is an optional CNI, and its version is configurable too from the `main.yaml` file 
+- the nodes are also now fully described in a YAML file (so only one place to configure both Terraform and Ansible)
+- I've added a section for when doing air-gapped install (but the mirroring is left as an exercise to the reader)
 - I'm using a Cent0S 10 cloud-init setup
 
 ### Setting things up
 
-We will need the following : 
-- A Proxmox server that can run 8 VMs (the temporary bootstrap, the control plane nodes, and the worker ones). I give them 16GB and 4 CPUs each 
+You will need the following : 
+- A Proxmox server that can run 8 VMs (the temporary bootstrap, the control plane nodes, and the worker ones). I give them 16GB and 4 CPUs each. 
 - (Optional) A dedicated subnet/VLAN (I used VLAN2 in my config : vmbr1, tag2 - it allows me to mess with a DHCP/DNS config without impacting my main network)
 - A CentOS cloudinit template to clone
 - A template of a PXE boot client to clone - no OS, it'll be provided by the PXE boot (not necessary though, the VMs could be created on the fly wihout cloning). Named `pxe-client` on my proxmox.
 - A resource pool (aka a folder) to show all Openshift VMs in a single view. Not mandatory, but my code uses it.
 
-(The next 3 will run on the "service" host : )
+(The next 3 may need to run on the "service" host if your network doesn't offer it : )
 - a DNS server
 - a TFTP server (to boot machines using PXE)
 - a Web server (for accessing the ignition files)
 
 - a pull secret in "./files/pull_secret.txt". If you don't have a pull secret, either get one from RedHat, or use '{"auths":{"fake":{"auth": "aWQ6cGFzcwo="}}}' as the file content - note the single quotes surrounding the whole string !
-- (Optional) A kitten happily sleeping in a box on your desk.
+- (Optional) A kitten happily sleeping in a box on your desk. 
 
 ![center](./files/okd-openshift.png)
 
@@ -43,16 +54,16 @@ I hardcoded *private* MAC addresses for my VMs. The way to make a private (unica
 
 So I'm chosing 7A (1111010) for the first byte. All my labs that require a private MAC address are in my 7A: scope. 
 
-| Name | IP | Mac Address | Role | OS | PXE Boot |
-|------|---------------|--------------------|------------------------------------|---------------------|-----|
-| master0 | 192.168.2.190 | 7A:00:00:00:03:01 | Control plane node #1 | FCOS | Yes |
-| master1 | 192.168.2.191 | 7A:00:00:00:03:02 | Control plane node #2 | FCOS | Yes |
-| master2 | 192.168.2.192 | 7A:00:00:00:03:03 | Control plane node #3 | FCOS | Yes |
-| worker0 | 192.168.2.193 | 7A:00:00:00:03:04 | Worker node #1 | FCOS | Yes |
-| worker1 | 192.168.2.194 | 7A:00:00:00:03:05 | Worker node #2 | FCOS | Yes |
-| worker2 | 192.168.2.195 | 7A:00:00:00:03:06 | Worker node #3 | FCOS| Yes |
-| bootstrap | 192.168.2.189 | 7A:00:00:00:03:07 | Bootstrap, needed to start the cluster | FCOS | Yes |
-| service | 192.168.2.196 | 7A:00:00:00:03:08 | DNS, DHCP, Load balancer, web server | Ubuntu 20/CentOS | No |
+| Name      | IP            | Mac Address       | Role                                   | OS               | PXE Boot |
+| --------- | ------------- | ----------------- | -------------------------------------- | ---------------- | -------- |
+| master0   | 192.168.2.190 | 7A:00:00:00:03:01 | Control plane node #1                  | FCOS             | Yes      |
+| master1   | 192.168.2.191 | 7A:00:00:00:03:02 | Control plane node #2                  | FCOS             | Yes      |
+| master2   | 192.168.2.192 | 7A:00:00:00:03:03 | Control plane node #3                  | FCOS             | Yes      |
+| worker0   | 192.168.2.193 | 7A:00:00:00:03:04 | Worker node #1                         | FCOS             | Yes      |
+| worker1   | 192.168.2.194 | 7A:00:00:00:03:05 | Worker node #2                         | FCOS             | Yes      |
+| worker2   | 192.168.2.195 | 7A:00:00:00:03:06 | Worker node #3                         | FCOS             | Yes      |
+| bootstrap | 192.168.2.189 | 7A:00:00:00:03:07 | Bootstrap, needed to start the cluster | FCOS             | Yes      |
+| service   | 192.168.2.196 | 7A:00:00:00:03:08 | DNS, DHCP, Load balancer, web server   | Ubuntu 20/CentOS | No       |
 
 The `hosts.ini` will be created based on the static IP addresses. I went the full dynamic route, only to get hit by some funky errors in the Proxmox terraform provider, which always used the same two VM IDs (for 8 nodes, doesn't help), and another annoying bug that forced me to got the static route until all this gets fixed.
 
@@ -65,6 +76,8 @@ The following services will be configured and started on the service host:
 - an HA Proxy, for ... proxying ... in high availability I guess ?
 
 ## How it works - the workflow
+
+(Below is the way it used to work when the playbook wasn't fully automated. It's still valuable to read, as it provides info on how the whole magic works.)
 
 The commands below assume you're a bit familiar with Unix and Kubernetes. Start by creating the VMs:
 
@@ -123,17 +136,9 @@ Wait for the command `openshift-install wait-for install-complete ...` to finish
 
 Enjoy !
 
-## Todo
-
-- [ ] Fire up the bootstrap node at the end of the Linux setup
-- [ ] Catch up the "bootstrap finished" message to fire up the work nodes automatically
-- [ ] Run the approval command automatically when a CSR is in Pending state
-- [ ] Remove as many shell commands in the playbook as possible
-- [ ] Cache OKD files on a local machine. Not useful when you only run things once, but when you're troubleshooting, it speeds up things (it's the longest part of the playbook, so would make sense ... )
-
 ## Troubleshooting
 
-It's the DNS. It's always the DNS. So check the DNS. And if it fails, recheck the DNS. Did I say to check the DNS ?
+It's the DNS. It's always the DNS. So check the DNS. And if it fails, recheck the DNS. Did I say "check the DNS" ?
 (honestly, it's one of the most DNS-sensitive install I have ever played with)
 
 ### "Node not found" in worker nodes logs 
@@ -177,7 +182,7 @@ Prepare your system as explained above, then boot the FCOS image without any con
 coreos-installer install /dev/sda --ignition-url http://192.168.2.186:8080/okd4/[bootstrap|master|worker].ign --insecure-ignition
 ```
 
-### After a reboot of Proxmox, my cluster doesn't come back up
+### After rebooting Proxmox, my cluster doesn't come back up
 
 Make sure the services server is up and running. Then, start all master nodes. Once booted, started the worker nodes. 
 
@@ -220,4 +225,11 @@ openshift-install --dir=install_dir/ wait-for install-complete --log-level=info
 cp install_dir/auth/kubeconfig ~/.kube/config
 oc get csr | grep Pending
 oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
+watch -n 5 "oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{\"\n\"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve"
 ```
+
+### Todo
+
+- [ ] Add the mirror registry as an option. Because, why not ?
+- [ ] Add an option to go full dynamic (VMIDs and IP addresses) or to use pre-defined values for the nodes.  
+- [ ] Create a new repo to create my CentOS template using code

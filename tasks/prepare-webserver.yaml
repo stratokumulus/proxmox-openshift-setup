@@ -1,0 +1,21 @@
+# Make these files available on the Web server
+- name: Copy all files to www directories
+  shell: cp -R /home/ansible/install_dir/* /var/www/html/okd4/
+
+- name: Change www ownership
+  file:
+    path: /var/www/html/okd4/
+    recurse: yes
+    state: directory
+    owner: apache
+    group: apache
+    mode: 0755
+
+- name: Change install_dir ownership
+  file:
+    path: /home/ansible/install_dir
+    recurse: yes
+    state: directory
+    owner: ansible
+    group: ansible
+    mode: 0755

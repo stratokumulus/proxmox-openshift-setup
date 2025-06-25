@@ -1,7 +1,20 @@
 ---
-jq_file: https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+# Cluster selection
+target: okd # either ocp or okd
+version: 4.18
+disconnected: false # true if using a disconnected environment, which requires setting up a mirror registry
+
+# Promox details
+vmbase: 400 # I like to have my nodes grouped in Proxmox, so this is the base VM ID index
+env: dev
+pxe_boot_os: pxe-client
+service_os: centos10-cloudinit
+
+# Networking
+cilium_repo: https://github.com/isovalent/olm-for-cilium.git
+cilium_version: 1.15.1
+
+# Ansible user account details
 user:
   name: ansible
   home: /home/ansible
-pxe_boot_os: pxe-client
-service_os: centos10-cloudinit

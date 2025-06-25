@@ -1,0 +1,40 @@
+- name: Starting worker node installation
+  shell: /usr/local/bin/openshift-install --dir=install_dir/ wait-for install-complete --log-level=debug > tmp/worker.log 2>&1
+  async: 3600
+  poll: 0
+# There's a need to approve pending certificate. That's what the "approve-csr.sh" does. Every 10 seconds, it tries to approve all pending CSRs ...
+# And does it for 1h (should be more than enough)
+- name: Auto approve certificates
+  shell: |
+    export KUBECONFIG=install_dir/auth/kubeconfig
+    while true; do ./approve-csr.sh; done
+  async: 3600
+  poll: 0
+# And we wait for the final "Install complete" message, that indicates the cluster is up and running :)
+- name: Wait for the proper output
+  command:
+    cmd: grep "Install complete" tmp/worker.log
+  retries: 720
+  delay: 5
+  register: grp
+  until: grp.stdout.find ("Install complete") != -1
+
+# Success ! Let's download the kubeconfig file
+- name: Fetch Kube config file
+  ansible.builtin.fetch:
+    src: install_dir/auth/kubeconfig
+    dest: files/kubeconfig
+    flat: yes
+
+- name: Retrieving password
+  slurp:
+    src: install_dir/auth/kubeadmin-password
+  register: kubeadmpwd
+
+# Let's roll the end credits ...
+- name: Installation finished
+  ansible.builtin.debug:
+    msg:
+      - "The installation is now complete."
+      - "The admin password is {{ kubeadmpwd.content | b64decode }}"
+      - "The KUBECONFIG is file/kubeconfig-okd"

@@ -1,0 +1,39 @@
+# Setting the timezone
+- name: set timezone to Europe/Brussels
+  timezone:
+    name: Europe/Brussels
+# Not using SElinux for the time being
+- name: No SELinux, thanks
+  selinux:
+    state: disabled
+
+- name: Create directories
+  file:
+    path: "{{ item.name }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: /var/www/html/okd4, owner: root, mode: "0755" }
+    - { name: /etc/named/zones, owner: root, mode: "0755" }
+    - { name: tmp, owner: ansible, mode: "0755" }
+    - { name: install_dir, owner: ansible, mode: "0755" }
+    - { name: /var/lib/tftpboot/fcos, owner: root, mode: "0755" }
+    - { name: /var/lib/tftpboot/pxelinux.cfg, owner: root, mode: "0755" }
+    - { name: /var/nfsshare/registry, owner: nobody, mode: "0777" }
+    - { name: /etc/dhcp, owner: root, mode: "0755" }
+
+# Need this here, just to make sure we have a working name resolution for packages installation
+- name: Overwrite resolv.conf
+  template:
+    src: templates/resolv.conf.j2
+    dest: /etc/resolv.conf
+    owner: root
+    mode: 0644
+
+# This script will be used to auto-approve CSR during the worker nodes bootstrapping sequence
+- name: Copy CSR approval script to the service host
+  copy:
+    src: files/approve-csr.sh
+    dest: approve-csr.sh
+    mode: 0755
