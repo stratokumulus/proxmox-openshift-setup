@@ -89,7 +89,7 @@ terraform apply
 
 Once done, run 
 ```
-ansible-playbook setup-linux.yaml
+ansible-playbook setup-okd.yaml
 ```
 
 Once successful, start the bootstrap VM. I usually wait for it to get to the first login screen, and then start the master nodes. I then SSH to the services host, and run 
@@ -231,5 +231,8 @@ watch -n 5 "oc get csr -o go-template='{{range .items}}{{if not .status}}{{.meta
 ### Todo
 
 - [ ] Add the mirror registry as an option. Because, why not ?
-- [ ] Add an option to go full dynamic (VMIDs and IP addresses) or to use pre-defined values for the nodes.  
+- [ ] Add an option to go full dynamic (VMIDs and IP addresses) or to use pre-defined values for the nodes.  I do this with other projects, so why not here ?
 - [ ] Create a new repo to create my CentOS template using code
+- [ ] Automate more, and work less. I have a symphony to write. 
+- [ ] Clean up the playbook even more, by using more tasks and tags 
+- [ ] Make the tasks delegated to a node, so that I have one play, and not multiple ones (especially visible when I have to jump between proxmox and the service nodes)
