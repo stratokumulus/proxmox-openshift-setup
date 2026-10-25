@@ -15,10 +15,12 @@ I can say that a lot of VMs died while I worked on this automated deployment. Ev
 ## Changelog, sort of ... 
 
 Last push:
+- added OKD 4.22. But that requires Cilium 1.19, and I can't find the manifests anymore (last ones I found are for 1.15.1, which runs up to OKD 4.17, so ... back to OVNKubernetes for the time being)
+- various enhancements
+  
+Previous changes : 
 - moved somes tasks from the main code to task files. Cleaner and easier to read, but functionnality stays the same
 - added tags, so that you can skip what you don't need (for instance, if you have an external DNS config and don't need to set it up, just run the playbook with `--skip dns`). More tags to come
-
-Previous changes : 
 - the full install is now 100% hands free. The playbook will install all services and fire up the OKD/OCP nodes (as long as you're on Proxmox)
 - I've added the OCP config as well as the existing OKD. Chose you poison ... 
 - I've added a variable to select the version to install. 
@@ -138,8 +140,7 @@ Enjoy !
 
 ## Troubleshooting
 
-It's the DNS. It's always the DNS. So check the DNS. And if it fails, recheck the DNS. Did I say "check the DNS" ?
-(honestly, it's one of the most DNS-sensitive install I have ever played with)
+It's the DNS. It's always the DNS. So check the DNS. And if it fails, recheck the DNS. Did I say "check the DNS" ? (honestly, it's one of the most DNS-sensitive install I have ever played with)
 
 ### "Node not found" in worker nodes logs 
 
