@@ -1,16 +1,16 @@
 #
 domain: homelab.local
-clusterid: okd
-resolver: 192.168.1.5
-hypervisor: 192.168.1.101
+clusterid: okd # Servers will thus be master0.okd.homelab.local, master1.okd.homelab.local, ...
+resolver: 10.20.1.5 # This points to a DNS server used by the service host. PXE-booted servers must get the one running on the service host via a DNS option. Other solulion would be to modify my home DNS server, which I don't want to (mostly because I'm lazy and don't want to figure out a way to do it and potentially polute my Pi Hole server. Wait ... isn't this line way too long ?)
+hypervisor: 10.20.1.101 # Points to the Proxmox host
 bridge: vmbr1
-vlan: 2
+vlan: 2 # My devices are in VLAN 2, configured as vmbr1.2 on my Proxmox host
 masters_schedulable: false
-home_subnet: 192.168.1.0/24
-lab_cidr: 192.168.2.0/24
-network_type: Cilium #or use OCK/OCP default, OVNKubernetes
-lab_subnet: 192.168.2.0
-lab_dhcp_start: 192.168.2.100
-lab_dhcp_stop: 192.168.2.150
-lab_broadcast: 192.168.2.255
-lab_gw: 192.168.2.1
+network_type: OVNKubernetes #Cilium #or use OCK/OCP default, OVNKubernetes
+lab_subnet: 10.20.2.0 # These addresses from here are not used
+home_subnet: 10.20.1.0/24
+lab_cidr: 10.20.2.0/24
+lab_dhcp_start: 10.20.2.100
+lab_dhcp_stop: 10.20.2.150
+lab_broadcast: 10.20.2.255
+lab_gw: 10.20.2.1

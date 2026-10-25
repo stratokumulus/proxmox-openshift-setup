@@ -1,7 +1,8 @@
 # Local .terraform directories
 **/.terraform/*
+**/.idea
 
-
+inventory/hosts.ini
 # .tfstate files
 *.tfstate
 *.tfstate.*

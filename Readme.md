@@ -54,16 +54,16 @@ I hardcoded *private* MAC addresses for my VMs. The way to make a private (unica
 
 So I'm chosing 7A (1111010) for the first byte. All my labs that require a private MAC address are in my 7A: scope. 
 
-| Name      | IP            | Mac Address       | Role                                   | OS               | PXE Boot |
-| --------- | ------------- | ----------------- | -------------------------------------- | ---------------- | -------- |
-| master0   | 192.168.2.190 | 7A:00:00:00:03:01 | Control plane node #1                  | FCOS             | Yes      |
-| master1   | 192.168.2.191 | 7A:00:00:00:03:02 | Control plane node #2                  | FCOS             | Yes      |
-| master2   | 192.168.2.192 | 7A:00:00:00:03:03 | Control plane node #3                  | FCOS             | Yes      |
-| worker0   | 192.168.2.193 | 7A:00:00:00:03:04 | Worker node #1                         | FCOS             | Yes      |
-| worker1   | 192.168.2.194 | 7A:00:00:00:03:05 | Worker node #2                         | FCOS             | Yes      |
-| worker2   | 192.168.2.195 | 7A:00:00:00:03:06 | Worker node #3                         | FCOS             | Yes      |
-| bootstrap | 192.168.2.189 | 7A:00:00:00:03:07 | Bootstrap, needed to start the cluster | FCOS             | Yes      |
-| service   | 192.168.2.196 | 7A:00:00:00:03:08 | DNS, DHCP, Load balancer, web server   | Ubuntu 20/CentOS | No       |
+| Name      | IP          | Mac Address       | Role                                   | OS               | PXE Boot |
+| --------- | ----------- | ----------------- | -------------------------------------- | ---------------- | -------- |
+| master0   | 10.20.2.190 | 7A:00:00:00:03:01 | Control plane node #1                  | FCOS             | Yes      |
+| master1   | 10.20.2.191 | 7A:00:00:00:03:02 | Control plane node #2                  | FCOS             | Yes      |
+| master2   | 10.20.2.192 | 7A:00:00:00:03:03 | Control plane node #3                  | FCOS             | Yes      |
+| worker0   | 10.20.2.193 | 7A:00:00:00:03:04 | Worker node #1                         | FCOS             | Yes      |
+| worker1   | 10.20.2.194 | 7A:00:00:00:03:05 | Worker node #2                         | FCOS             | Yes      |
+| worker2   | 10.20.2.195 | 7A:00:00:00:03:06 | Worker node #3                         | FCOS             | Yes      |
+| bootstrap | 10.20.2.189 | 7A:00:00:00:03:07 | Bootstrap, needed to start the cluster | FCOS             | Yes      |
+| service   | 10.20.2.196 | 7A:00:00:00:03:08 | DNS, DHCP, Load balancer, web server   | Ubuntu 20/CentOS | No       |
 
 The `hosts.ini` will be created based on the static IP addresses. I went the full dynamic route, only to get hit by some funky errors in the Proxmox terraform provider, which always used the same two VM IDs (for 8 nodes, doesn't help), and another annoying bug that forced me to got the static route until all this gets fixed.
 
@@ -179,7 +179,7 @@ You can do the same for each of the other nodes, as they all share the same SSH 
 ### Bare metal install
 Prepare your system as explained above, then boot the FCOS image without any config or PXE boot, and run the command below based on the role of the node (bootstrap, master or worker) 
 ```
-coreos-installer install /dev/sda --ignition-url http://192.168.2.186:8080/okd4/[bootstrap|master|worker].ign --insecure-ignition
+coreos-installer install /dev/sda --ignition-url http://10.20.2.186:8080/okd4/[bootstrap|master|worker].ign --insecure-ignition
 ```
 
 ### After rebooting Proxmox, my cluster doesn't come back up
@@ -202,10 +202,9 @@ oc get csr | grep Pending
 oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' | xargs --no-run-if-empty oc adm certificate approve
 ```
 
-
 ### Other issues
 
-Check your DNS config. "It's always DNS" ! I cannot emphasize this enough : DNS is critical to get this mammoth working 
+Check your DNS config. "It's always DNS" ! I cannot emphasize this enough : DNS is critical to get this mammoth working.
 
 I sometimes had to SSH to the bootstrap server, and add the okd-services server in /etc/hosts. Sucks. But worked. I should keep a "stable" VLAN and services for OKD, but hey, it's a lab :D 
 
@@ -213,13 +212,13 @@ I sometimes had to SSH to the bootstrap server, and add the okd-services server 
 
 Just so I can copy paste ... I will turn many of these into a post-install playbook to handle things all automatically
 ``` 
-ssh root@192.168.1.101 "/usr/sbin/qm start 807"
+ssh root@10.20.1.101 "/usr/sbin/qm start 807"
 openshift-install --dir=install_dir/ wait-for bootstrap-complete --log-level=info
-ssh root@192.168.1.101 "/usr/sbin/qm start 801 && /usr/sbin/qm start 802 && /usr/sbin/qm start 803"
-ssh root@192.168.1.101 "/usr/sbin/qm stop 807"
+ssh root@10.20.1.101 "/usr/sbin/qm start 801 && /usr/sbin/qm start 802 && /usr/sbin/qm start 803"
+ssh root@10.20.1.101 "/usr/sbin/qm stop 807"
 sudo systemctl restart haproxy
 sudo vi /etc/haproxy/haproxy.cfg 
-ssh root@192.168.1.101 "/usr/sbin/qm start 804 && /usr/sbin/qm start 805 && /usr/sbin/qm start 806"
+ssh root@10.20.1.101 "/usr/sbin/qm start 804 && /usr/sbin/qm start 805 && /usr/sbin/qm start 806"
 openshift-install --dir=install_dir/ wait-for bootstrap-complete --log-level=info
 openshift-install --dir=install_dir/ wait-for install-complete --log-level=info
 cp install_dir/auth/kubeconfig ~/.kube/config
@@ -233,6 +232,6 @@ watch -n 5 "oc get csr -o go-template='{{range .items}}{{if not .status}}{{.meta
 - [ ] Add the mirror registry as an option. Because, why not ?
 - [ ] Add an option to go full dynamic (VMIDs and IP addresses) or to use pre-defined values for the nodes.  I do this with other projects, so why not here ?
 - [ ] Create a new repo to create my CentOS template using code
-- [ ] Automate more, and work less. I have a symphony to write. 
+- [ ] Automate more, and work less on this : I have a symphony to finish (no, seriously) !
 - [ ] Clean up the playbook even more, by using more tasks and tags 
 - [ ] Make the tasks delegated to a node, so that I have one play, and not multiple ones (especially visible when I have to jump between proxmox and the service nodes)

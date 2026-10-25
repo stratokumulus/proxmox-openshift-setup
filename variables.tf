@@ -1,7 +1,7 @@
 variable "api_url" {
   description = "URL to the API of Proxmox"
   type        = string
-  default     = "https://192.168.1.101:8006/api2/json"
+  default     = "https://10.20.1.101:8006/api2/json"
 }
 
 variable "user" {

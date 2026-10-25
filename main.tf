@@ -1,22 +1,28 @@
+locals {
+  pool_id = "${local.main.target}-cluster-${local.main.env}"
+}
+
 ##############################
 # Creating cloud-init devices.
 ##############################
 resource "proxmox_vm_qemu" "service-node" {
-  depends_on  = [proxmox_pool.cluster]
-  name        = local.service.name
-  vmid        = local.service.vmid
-  target_node = var.target_host
-  clone       = local.service.os
-  full_clone  = true
-  boot        = "order=scsi0;net0" # "c" by default, which renders the coreos35 clone non-bootable. "cdn" is HD, DVD and Network
-  agent       = 1
-  tags        = "${local.main.target},service"
-  pool        = "${local.main.target}-cluster"
-  onboot      = true
-  vm_state    = "running" #local.service.boot # start once created
+  depends_on         = [proxmox_pool.cluster]
+  name               = local.service.name
+  vmid               = local.service.vmid
+  target_node        = var.target_host
+  clone              = local.service.os
+  full_clone         = true
+  boot               = "order=scsi0;net0" # "c" by default, which renders the coreos35 clone non-bootable. "cdn" is HD, DVD and Network
+  agent              = 1
+  tags               = "${local.main.target},service"
+  pool               = local.pool_id
+  start_at_node_boot = true
+  vm_state           = "running" #local.service.boot # start once created
 
 
-  cores    = local.service.cores
+  cpu {
+    cores = local.service.cores
+  }
   memory   = local.service.ram
   scsihw   = "virtio-scsi-pci"
   bootdisk = "scsi0"
@@ -69,21 +75,22 @@ resource "proxmox_vm_qemu" "service-node" {
 resource "proxmox_vm_qemu" "pxe-nodes" {
   depends_on = [proxmox_pool.cluster]
 
-  for_each    = local.all_pxe_nodes
-  name        = "${local.main.env}-${local.main.target}-${each.key}"
-  vmid        = each.value.vmid
-  target_node = var.target_host
-  clone       = each.value.os
-  full_clone  = true
-  boot        = "order=scsi0;net0" # "c" by default, which renders the coreos35 clone non-bootable. "cdn" is HD, DVD and Network
-  agent       = 0
-  tags        = local.main.target
-  pool        = "${local.main.target}-cluster"
+  for_each           = local.all_pxe_nodes
+  name               = "${local.main.env}-${local.main.target}-${each.key}"
+  vmid               = each.value.vmid
+  target_node        = var.target_host
+  clone              = each.value.os
+  full_clone         = true
+  boot               = "order=scsi0;net0" # "c" by default, which renders the coreos35 clone non-bootable. "cdn" is HD, DVD and Network
+  agent              = 0
+  tags               = local.main.target
+  pool               = local.pool_id
+  start_at_node_boot = true
+  vm_state           = each.value.boot #each.value.boot # start once created
 
-  onboot   = true
-  vm_state = each.value.boot #each.value.boot # start once created
-
-  cores    = each.value.cores
+  cpu {
+    cores = each.value.cores
+  }
   memory   = each.value.ram
   scsihw   = "virtio-scsi-pci"
   bootdisk = "scsi0"
@@ -110,7 +117,7 @@ resource "proxmox_vm_qemu" "pxe-nodes" {
 }
 
 resource "proxmox_pool" "cluster" {
-  poolid  = "${local.main.target}-cluster-${local.main.env}"
+  poolid  = local.pool_id
   comment = "All ${local.main.target} VMs"
 }
 

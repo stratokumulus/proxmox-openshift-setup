@@ -6,10 +6,13 @@ ${ bootstrap_ip }
 
 [masters]
 %{ for i in masters ~}
-${ i } 
+${ i }
 %{ endfor ~}
 
 [workers]
 %{ for i in workers ~}
 ${ i }
 %{ endfor ~}
+
+[hypervisor]
+${ hypervisor_ip }

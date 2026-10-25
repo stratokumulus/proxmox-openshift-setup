@@ -28,3 +28,8 @@
   service:
     name: tftp
     state: started
+
+- name: Restart HA
+  service:
+    name: haproxy
+    state: restarted

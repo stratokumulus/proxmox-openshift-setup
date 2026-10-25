@@ -1,7 +1,7 @@
 ---
 # Cluster selection
 target: okd # either ocp or okd
-version: 4.18
+version: 4.22
 disconnected: false # true if using a disconnected environment, which requires setting up a mirror registry
 
 # Promox details
@@ -12,7 +12,7 @@ service_os: centos10-cloudinit
 
 # Networking
 cilium_repo: https://github.com/isovalent/olm-for-cilium.git
-cilium_version: 1.15.1
+cilium_version: 1.15.1 # 1.19.10 for OKD 4.22, but manifests are hard to find ... i'll figure it out another time
 
 # Ansible user account details
 user:
